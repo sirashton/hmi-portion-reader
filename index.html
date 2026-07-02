@@ -66,6 +66,8 @@
   <button id="startBtn" class="btn-go" disabled>▶ Start</button>
   <button id="stopBtn" class="btn-stop" style="display:none">■ Stop</button>
   <button id="camBtn" class="btn-ghost">⟲ Camera</button>
+  <button id="videoBtn" class="btn-ghost">📁 Video</button>
+  <input id="fileInput" type="file" accept="video/*" style="display:none">
 </div>
 
 <div class="camwrap" id="camwrap">
@@ -96,7 +98,7 @@
 "use strict";
 const $ = id => document.getElementById(id);
 const video=$('video'), roi=$('roi'), camwrap=$('camwrap'), banner=$('banner');
-let worker=null, stream=null, running=false, loopTimer=null, startTs=0;
+let worker=null, stream=null, running=false, loopTimer=null, startTs=0, srcMode='camera';
 let rows=[];            // committed log rows
 let committed=null;     // {t1,t2} of the portion currently on top
 let pending=null, pendingN=0;
@@ -131,7 +133,21 @@ async function startCamera(){
     placeRoiDefault();
   }catch(e){ showErr('Camera error: '+e.message+'  (a phone needs the page served over HTTPS)'); }
 }
-$('camBtn').onclick=()=>{ facing = facing==='environment'?'user':'environment'; startCamera(); };
+$('camBtn').onclick=()=>{ srcMode='camera'; video.removeAttribute('src'); video.load(); facing = facing==='environment'?'user':'environment'; startCamera(); };
+
+/* ---------------- video-file source ---------------- */
+$('videoBtn').onclick=()=>$('fileInput').click();
+$('fileInput').onchange=e=>{
+  const f=e.target.files&&e.target.files[0]; if(!f) return;
+  if(running) $('stopBtn').click();
+  if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
+  srcMode='file'; video.srcObject=null; video.muted=true; video.playsInline=true; video.loop=false;
+  video.src=URL.createObjectURL(f);
+  video.onloadeddata=()=>{ video.pause(); try{video.currentTime=0;}catch(_){}} ;
+  video.onloadedmetadata=()=>{ placeRoiDefault(); banner.style.display='none'; };
+  $('live').textContent='—';
+};
+video.addEventListener('ended',()=>{ if(running && srcMode==='file') $('stopBtn').click(); });
 
 /* ---------------- ROI (draggable + resizable) ---------------- */
 let roiBox={x:0,y:0,w:0,h:0};
@@ -213,8 +229,9 @@ function samePortion(a,b){
   if(a.t1==null&&a.t2==null) return false;
   return cmp(a.t1,b.t1)&&cmp(a.t2,b.t2);
 }
+function nowT(){ return srcMode==='file' ? (video.currentTime||0) : (performance.now()-startTs)/1000; }
 function commit(p){
-  const t=(performance.now()-startTs)/1000;
+  const t=nowT();
   rows.push({t:t.toFixed(1), t1:p.t1, t2:p.t2, raw:p.raw});
   const tr=document.createElement('tr');
   tr.innerHTML=`<td>${rows.length}</td><td>${t.toFixed(1)}</td><td>${p.t1??''}</td><td>${p.t2??''}</td><td style="color:#7d8a89">${p.raw}</td>`;
@@ -240,7 +257,7 @@ async function tick(){
     }catch(e){ /* ignore a bad frame */ }
     $('pill').className='pill on';
   }
-  const clk=(performance.now()-startTs)/1000; $('clock').textContent=Math.floor(clk/60)+':'+String(Math.floor(clk%60)).padStart(2,'0');
+  const clk=nowT(); $('clock').textContent=Math.floor(clk/60)+':'+String(Math.floor(clk%60)).padStart(2,'0');
   const interval=1000/parseInt($('fps').value,10);
   const wait=Math.max(0,interval-(performance.now()-t0));
   loopTimer=setTimeout(tick,wait);
@@ -250,13 +267,15 @@ async function tick(){
 $('startBtn').onclick=()=>{
   const name=$('fname').value.trim();
   if(!name){ $('fname').focus(); return; }
-  if(!video.videoWidth){ showErr('Camera not ready yet.'); return; }
+  if(!video.videoWidth){ showErr(srcMode==='file'?'Video not loaded yet.':'Camera not ready yet.'); return; }
   running=true; startTs=performance.now(); committed=null; pending=null; pendingN=0;
+  if(srcMode==='file'){ if(video.ended||video.currentTime>=(video.duration||1e9)) { try{video.currentTime=0;}catch(_){}} video.play(); }
   $('startBtn').style.display='none'; $('stopBtn').style.display='block';
   $('fname').disabled=true; tick();
 };
 $('stopBtn').onclick=()=>{
   running=false; if(loopTimer)clearTimeout(loopTimer);
+  if(srcMode==='file') video.pause();
   $('stopBtn').style.display='none'; $('startBtn').style.display='block';
   $('fname').disabled=false; $('pill').className='pill';
   if(rows.length) exportCSV();
