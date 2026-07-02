@@ -26,7 +26,11 @@
   .btn-stop{background:var(--reject);color:#fff;flex:1;}
   .btn-ghost{background:#fff;color:var(--ink);border:1px solid var(--grid);}
   button:disabled{opacity:.45;}
-  .camwrap{position:relative;width:100%;height:52vh;min-height:240px;background:#000;overflow:hidden;line-height:0;touch-action:none;}
+  .camwrap{position:relative;width:100%;flex:1 1 auto;min-height:240px;background:#000;overflow:hidden;line-height:0;touch-action:none;}
+  .coordrow{gap:6px;padding:7px 12px;}
+  .coordrow .cl{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;}
+  .coordrow label{display:flex;align-items:center;gap:3px;font-size:12px;font-weight:600;color:var(--muted);}
+  .coordrow input{width:58px;padding:6px 6px;border:1px solid var(--grid);border-radius:7px;font-size:14px;font-variant-numeric:tabular-nums;color:var(--ink);}
   .camwrap video{position:absolute;left:0;top:0;transform-origin:0 0;display:block;pointer-events:none;}
   .zoomctl{position:absolute;left:8px;bottom:8px;display:flex;gap:6px;z-index:6;}
   .zoomctl button{width:40px;height:40px;border-radius:9px;border:none;background:rgba(42,59,58,.82);color:#fff;font-size:20px;font-weight:700;line-height:1;padding:0;}
@@ -39,7 +43,7 @@
   .readout .lbl{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;}
   .stat{font-size:12px;color:var(--muted);}
   .stat b{color:var(--ink);}
-  .logwrap{flex:1;overflow:auto;background:var(--panel);}
+  .logwrap{flex:0 0 auto;max-height:26vh;overflow:auto;background:var(--panel);}
   table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums;}
   th,td{padding:6px 10px;text-align:right;border-bottom:1px solid var(--grid);}
   th:first-child,td:first-child{text-align:left;}
@@ -81,6 +85,14 @@
     <button data-z="fit">Fit</button>
     <button data-z="in" aria-label="Zoom in">+</button>
   </div>
+</div>
+
+<div class="controls coordrow">
+  <span class="cl">Box&nbsp;(px)</span>
+  <label>X<input id="rx" type="number" inputmode="numeric" autocomplete="off"></label>
+  <label>Y<input id="ry" type="number" inputmode="numeric" autocomplete="off"></label>
+  <label>W<input id="rw" type="number" inputmode="numeric" autocomplete="off"></label>
+  <label>H<input id="rh" type="number" inputmode="numeric" autocomplete="off"></label>
 </div>
 
 <div class="readout">
@@ -157,19 +169,22 @@ $('fileInput').onchange=e=>{
 };
 video.addEventListener('ended',()=>{ if(running && srcMode==='file') $('stopBtn').click(); });
 
-/* ---------------- ROI (draggable + resizable) ---------------- */
-let roiBox={x:0,y:0,w:0,h:0};
-function placeRoiDefault(){
-  const r=camwrap.getBoundingClientRect();
-  roiBox={x:r.width*0.18,y:r.height*0.20,w:r.width*0.64,h:r.height*0.55};
-  drawRoi();
-}
-function drawRoi(){ roi.style.left=roiBox.x+'px';roi.style.top=roiBox.y+'px';roi.style.width=roiBox.w+'px';roi.style.height=roiBox.h+'px'; }
-function clampRoi(){
-  const r=camwrap.getBoundingClientRect();
-  roiBox.w=Math.max(60,Math.min(roiBox.w,r.width)); roiBox.h=Math.max(50,Math.min(roiBox.h,r.height));
-  roiBox.x=Math.max(0,Math.min(roiBox.x,r.width-roiBox.w)); roiBox.y=Math.max(0,Math.min(roiBox.y,r.height-roiBox.h));
-}
+/* ---------------- ROI — canonical in SOURCE pixels (so tests are repeatable) ---------------- */
+let roiSrc={x:0,y:0,w:0,h:0};   // region of the video frame, in source pixels (the truth)
+let roiBox={x:0,y:0,w:0,h:0};   // its on-screen rect, derived from roiSrc + current view
+const CID=['rx','ry','rw','rh'];
+function vidRectCam(){ const c=camwrap.getBoundingClientRect(), v=video.getBoundingClientRect(); return {left:v.left-c.left, top:v.top-c.top, w:v.width}; }
+function srcToScreen(s){ const vr=vidRectCam(), k=vr.w/(video.videoWidth||1); return {x:vr.left+s.x*k, y:vr.top+s.y*k, w:s.w*k, h:s.h*k}; }
+function screenToSrc(b){ const vr=vidRectCam(), k=vr.w/(video.videoWidth||1); return {x:(b.x-vr.left)/k, y:(b.y-vr.top)/k, w:b.w/k, h:b.h/k}; }
+function clampSrc(){ const vw=video.videoWidth||1, vh=video.videoHeight||1;
+  roiSrc.w=Math.max(8,Math.min(roiSrc.w,vw)); roiSrc.h=Math.max(8,Math.min(roiSrc.h,vh));
+  roiSrc.x=Math.max(0,Math.min(roiSrc.x,vw-roiSrc.w)); roiSrc.y=Math.max(0,Math.min(roiSrc.y,vh-roiSrc.h)); }
+function styleRoi(){ roi.style.left=roiBox.x+'px';roi.style.top=roiBox.y+'px';roi.style.width=roiBox.w+'px';roi.style.height=roiBox.h+'px'; }
+function syncCoordInputs(){ const a=document.activeElement; if(a&&CID.includes(a.id)) return; $('rx').value=Math.round(roiSrc.x);$('ry').value=Math.round(roiSrc.y);$('rw').value=Math.round(roiSrc.w);$('rh').value=Math.round(roiSrc.h); }
+function renderRoi(){ if(!video.videoWidth) return; roiBox=srcToScreen(roiSrc); styleRoi(); syncCoordInputs(); }   // src -> screen box
+function placeRoiDefault(){ const vw=video.videoWidth||480, vh=video.videoHeight||850; roiSrc={x:Math.round(vw*0.30),y:Math.round(vh*0.22),w:Math.round(vw*0.45),h:Math.round(vh*0.50)}; renderRoi(); }
+CID.forEach(id=>$(id).addEventListener('change',()=>{ roiSrc={x:+$('rx').value||0,y:+$('ry').value||0,w:+$('rw').value||0,h:+$('rh').value||0}; clampSrc(); renderRoi(); }));
+
 let drag=null;
 function ptr(e){ const t=e.touches?e.touches[0]:e; return {x:t.clientX,y:t.clientY}; }
 roi.addEventListener('pointerdown',e=>{
@@ -177,17 +192,17 @@ roi.addEventListener('pointerdown',e=>{
   drag={mode:isHandle?'resize':'move',start:ptr(e),box:{...roiBox}}; roi.setPointerCapture(e.pointerId); e.preventDefault(); e.stopPropagation();
 });
 roi.addEventListener('pointermove',e=>{
-  if(!drag)return; const p=ptr(e); const dx=p.x-drag.start.x, dy=p.y-drag.start.y;
+  if(!drag)return; const p=ptr(e), dx=p.x-drag.start.x, dy=p.y-drag.start.y;
   if(drag.mode==='move'){ roiBox.x=drag.box.x+dx; roiBox.y=drag.box.y+dy; }
-  else { roiBox.w=drag.box.w+dx; roiBox.h=drag.box.h+dy; }
-  clampRoi(); drawRoi(); e.preventDefault();
+  else { roiBox.w=Math.max(16,drag.box.w+dx); roiBox.h=Math.max(16,drag.box.h+dy); }
+  styleRoi(); roiSrc=screenToSrc(roiBox); clampSrc(); syncCoordInputs(); e.preventDefault();
 });
-roi.addEventListener('pointerup',()=>{ drag=null; });
-window.addEventListener('resize',()=>{ fitVideo(); clampRoi(); drawRoi(); });
+roi.addEventListener('pointerup',()=>{ if(drag){ drag=null; renderRoi(); } });
+window.addEventListener('resize',()=>{ fitVideo(); });
 
 /* ---------------- pan & zoom the video (pinch / drag / buttons / wheel) ---------------- */
 let zoom=1, panX=0, panY=0;
-function applyView(){ video.style.transform=`translate(${panX}px,${panY}px) scale(${zoom})`; }
+function applyView(){ video.style.transform=`translate(${panX}px,${panY}px) scale(${zoom})`; renderRoi(); }
 function fitVideo(){
   const vw=video.videoWidth, vh=video.videoHeight; if(!vw) return;
   const r=camwrap.getBoundingClientRect();
@@ -213,15 +228,9 @@ camwrap.addEventListener('pointerup',endPtr); camwrap.addEventListener('pointerc
 const work = document.createElement('canvas'), wctx=work.getContext('2d',{willReadFrequently:true});
 function grabRoiCanvas(){
   const vw=video.videoWidth, vh=video.videoHeight; if(!vw) return null;
-  // map the ROI (camwrap coords) into SOURCE pixels via the video's rendered rect,
-  // which already reflects pan/zoom and preserves aspect (no stretch).
-  const camR=camwrap.getBoundingClientRect(), vidR=video.getBoundingClientRect();
-  if(!vidR.width||!vidR.height) return null;
-  const sx=vw/vidR.width, sy=vh/vidR.height;
-  let cx=(camR.left+roiBox.x-vidR.left)*sx, cy=(camR.top+roiBox.y-vidR.top)*sy;
-  let cw=roiBox.w*sx, ch=roiBox.h*sy;
-  if(cx<0){cw+=cx;cx=0;} if(cy<0){ch+=cy;cy=0;}
-  cw=Math.min(cw,vw-cx); ch=Math.min(ch,vh-cy);
+  // capture straight from the source-pixel ROI — independent of pan/zoom, so repeatable
+  let cx=Math.max(0,Math.min(roiSrc.x,vw-1)), cy=Math.max(0,Math.min(roiSrc.y,vh-1));
+  let cw=Math.min(roiSrc.w,vw-cx), ch=Math.min(roiSrc.h,vh-cy);
   if(cw<=1||ch<=1) return null;                            // ROI off the video
   const scale=Math.min(3, 1400/Math.max(1,cw));            // upscale small crops
   work.width=Math.round(cw*scale); work.height=Math.round(ch*scale);
@@ -339,6 +348,8 @@ window.__ocrTest=async function(url){
   const {data}=await worker.recognize(work,{},{blocks:true});
   return {text:data.text, parsedTop:parseFrame(data, work.width)};
 };
+// dev: load a served video URL (e.g. the canonical test clip) for repeatable testing
+window.__loadTestVid=(url)=>{ if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;} srcMode='file'; video.srcObject=null; video.muted=true; video.playsInline=true; video.loop=false; video.src=url; video.onloadeddata=()=>{ video.pause(); try{video.currentTime=0;}catch(_){}} ; video.onloadedmetadata=()=>{ fitVideo(); placeRoiDefault(); banner.style.display='none'; }; };
 
 /* ---------------- go ---------------- */
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }

@@ -12,8 +12,13 @@ portion weights to a CSV. **All processing is on-device** — no image or data e
 4. Type a **trial name** (this becomes the CSV filename).
 5. **Pan/zoom** the view (pinch, drag the background, or the −/Fit/+ buttons) to enlarge the
    number list, then drag/resize the green box to frame the weight column(s). For two tracks,
-   include both columns; the far-left index numbers can be left out. Video keeps its aspect
-   ratio (no stretch).
+   include both columns; the far-left index numbers can be left out. Video fills the viewport
+   and keeps its aspect ratio (no stretch).
+   - **Repeatable trials:** the box position is shown in **Box (px)** as X/Y/W/H in *video-pixel*
+     coordinates. Note them down and re-type them next time to reproduce the exact capture window.
+     The box is anchored to the video, so zooming/panning to position it never changes what's
+     captured. (Coordinates are per video resolution — the same numbers reproduce on clips of the
+     same size.)
 6. Tap **Start** — for the camera, point steadily at the screen (a fixed stand is best);
    for a video, it plays and reads automatically, stopping at the end.
 7. Tap **Stop** (or let a video finish) — the CSV downloads automatically.
