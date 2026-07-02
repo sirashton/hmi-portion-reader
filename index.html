@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#2a3b3a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>HMI Portion Reader</title>
+<style>
+  :root{--bg:#f4f6f6;--panel:#fff;--ink:#2a3b3a;--muted:#7d8a89;--grid:#dfe7e6;--pos:#0f7173;--accent:#0f7173;--reject:#e23b34;}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+       color:var(--ink);background:var(--bg);display:flex;flex-direction:column;min-height:100%;}
+  header{background:var(--ink);color:#fff;padding:10px 14px;}
+  header h1{font-size:15px;margin:0;font-weight:600;letter-spacing:.2px;}
+  header .sub{font-size:11px;opacity:.7;margin-top:2px;}
+  .controls{padding:10px 12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--panel);border-bottom:1px solid var(--grid);}
+  .controls label{font-size:12px;color:var(--muted);font-weight:600;}
+  input[type=text]{flex:1;min-width:120px;padding:9px 10px;border:1px solid var(--grid);border-radius:8px;font-size:15px;color:var(--ink);}
+  select{padding:9px 8px;border:1px solid var(--grid);border-radius:8px;font-size:14px;background:#fff;color:var(--ink);}
+  button{border:none;border-radius:8px;padding:10px 14px;font-size:14px;font-weight:700;cursor:pointer;}
+  .btn-go{background:var(--pos);color:#fff;flex:1;}
+  .btn-stop{background:var(--reject);color:#fff;flex:1;}
+  .btn-ghost{background:#fff;color:var(--ink);border:1px solid var(--grid);}
+  button:disabled{opacity:.45;}
+  .camwrap{position:relative;width:100%;background:#000;overflow:hidden;line-height:0;}
+  video{width:100%;height:auto;display:block;}
+  #roi{position:absolute;border:2px solid var(--pos);box-shadow:0 0 0 9999px rgba(0,0,0,.35);border-radius:4px;touch-action:none;cursor:move;}
+  #roi .handle{position:absolute;width:26px;height:26px;right:-13px;bottom:-13px;background:var(--pos);border:3px solid #fff;border-radius:50%;touch-action:none;}
+  #roi .tag{position:absolute;top:-22px;left:0;background:var(--pos);color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;line-height:1.3;white-space:nowrap;}
+  .readout{padding:10px 12px;background:var(--panel);border-bottom:1px solid var(--grid);display:flex;gap:14px;align-items:baseline;flex-wrap:wrap;}
+  .readout .big{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--pos);}
+  .readout .lbl{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;}
+  .stat{font-size:12px;color:var(--muted);}
+  .stat b{color:var(--ink);}
+  .logwrap{flex:1;overflow:auto;background:var(--panel);}
+  table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums;}
+  th,td{padding:6px 10px;text-align:right;border-bottom:1px solid var(--grid);}
+  th:first-child,td:first-child{text-align:left;}
+  thead th{position:sticky;top:0;background:#eef3f2;color:var(--muted);font-size:11px;text-transform:uppercase;z-index:1;}
+  .foot{padding:8px 12px;display:flex;gap:8px;background:var(--panel);border-top:1px solid var(--grid);}
+  .banner{padding:10px 12px;font-size:13px;background:#fff4d6;color:#6b5300;border-bottom:1px solid #e8d98a;}
+  .banner.err{background:#fdecec;color:#a11;border-color:#f2b8b8;}
+  .pill{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--muted);margin-right:5px;vertical-align:middle;}
+  .pill.on{background:var(--pos);} .pill.busy{background:#e0a100;}
+</style>
+</head>
+<body>
+<header>
+  <h1>Portion Reader <span style="opacity:.6;font-weight:400">· MVP</span></h1>
+  <div class="sub">On-device screen reader — logs portion weights to CSV. Nothing leaves this device.</div>
+</header>
+
+<div id="banner" class="banner">Loading on-device OCR… (installs for offline use on first load)</div>
+
+<div class="controls">
+  <label for="fname">CSV</label>
+  <input id="fname" type="text" value="trial_1" autocomplete="off" spellcheck="false">
+  <label for="fps">fps</label>
+  <select id="fps"><option>1</option><option selected>2</option><option>3</option></select>
+</div>
+<div class="controls" style="border-bottom:none;padding-top:0;">
+  <button id="startBtn" class="btn-go" disabled>▶ Start</button>
+  <button id="stopBtn" class="btn-stop" style="display:none">■ Stop</button>
+  <button id="camBtn" class="btn-ghost">⟲ Camera</button>
+</div>
+
+<div class="camwrap" id="camwrap">
+  <video id="video" playsinline muted></video>
+  <div id="roi"><div class="tag">Frame the number list</div><div class="handle"></div></div>
+</div>
+
+<div class="readout">
+  <div><div class="lbl"><span id="pill" class="pill"></span>Live read</div><div class="big" id="live">—</div></div>
+  <div class="stat">Logged: <b id="count">0</b></div>
+  <div class="stat">Time: <b id="clock">0:00</b></div>
+</div>
+
+<div class="logwrap">
+  <table>
+    <thead><tr><th>#</th><th>t (s)</th><th>Track 1</th><th>Track 2</th><th>raw</th></tr></thead>
+    <tbody id="log"></tbody>
+  </table>
+</div>
+
+<div class="foot">
+  <button id="exportBtn" class="btn-ghost" style="flex:1">⬇ Download CSV</button>
+  <button id="clearBtn" class="btn-ghost">Clear</button>
+</div>
+
+<script src="tess/tesseract.min.js"></script>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const video=$('video'), roi=$('roi'), camwrap=$('camwrap'), banner=$('banner');
+let worker=null, stream=null, running=false, loopTimer=null, startTs=0;
+let rows=[];            // committed log rows
+let committed=null;     // {t1,t2} of the portion currently on top
+let pending=null, pendingN=0;
+
+/* ---------------- OCR init ---------------- */
+async function initOCR(){
+  try{
+    const TB = new URL('tess/', location.href).href;   // absolute — worker importScripts needs it
+    worker = await Tesseract.createWorker('eng', 1, {
+      workerPath: TB+'worker.min.js',
+      corePath: TB,
+      langPath: TB,
+      cacheMethod:'none'
+    });
+    await worker.setParameters({
+      tessedit_char_whitelist:'0123456789. ',
+      tessedit_pageseg_mode:'6',        // assume a uniform block of text
+    });
+    banner.style.display='none';
+    $('startBtn').disabled=false;
+  }catch(e){ showErr('Could not load OCR engine: '+e.message); }
+}
+function showErr(m){ banner.className='banner err'; banner.style.display='block'; banner.textContent=m; }
+
+/* ---------------- camera ---------------- */
+let facing='environment';
+async function startCamera(){
+  if(stream) stream.getTracks().forEach(t=>t.stop());
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:facing},width:{ideal:1920},height:{ideal:1080}}});
+    video.srcObject=stream; await video.play();
+    placeRoiDefault();
+  }catch(e){ showErr('Camera error: '+e.message+'  (a phone needs the page served over HTTPS)'); }
+}
+$('camBtn').onclick=()=>{ facing = facing==='environment'?'user':'environment'; startCamera(); };
+
+/* ---------------- ROI (draggable + resizable) ---------------- */
+let roiBox={x:0,y:0,w:0,h:0};
+function placeRoiDefault(){
+  const r=camwrap.getBoundingClientRect();
+  roiBox={x:r.width*0.18,y:r.height*0.20,w:r.width*0.64,h:r.height*0.55};
+  drawRoi();
+}
+function drawRoi(){ roi.style.left=roiBox.x+'px';roi.style.top=roiBox.y+'px';roi.style.width=roiBox.w+'px';roi.style.height=roiBox.h+'px'; }
+function clampRoi(){
+  const r=camwrap.getBoundingClientRect();
+  roiBox.w=Math.max(60,Math.min(roiBox.w,r.width)); roiBox.h=Math.max(50,Math.min(roiBox.h,r.height));
+  roiBox.x=Math.max(0,Math.min(roiBox.x,r.width-roiBox.w)); roiBox.y=Math.max(0,Math.min(roiBox.y,r.height-roiBox.h));
+}
+let drag=null;
+function ptr(e){ const t=e.touches?e.touches[0]:e; return {x:t.clientX,y:t.clientY}; }
+roi.addEventListener('pointerdown',e=>{
+  const isHandle=e.target.classList.contains('handle');
+  drag={mode:isHandle?'resize':'move',start:ptr(e),box:{...roiBox}}; roi.setPointerCapture(e.pointerId); e.preventDefault();
+});
+roi.addEventListener('pointermove',e=>{
+  if(!drag)return; const p=ptr(e); const dx=p.x-drag.start.x, dy=p.y-drag.start.y;
+  if(drag.mode==='move'){ roiBox.x=drag.box.x+dx; roiBox.y=drag.box.y+dy; }
+  else { roiBox.w=drag.box.w+dx; roiBox.h=drag.box.h+dy; }
+  clampRoi(); drawRoi(); e.preventDefault();
+});
+roi.addEventListener('pointerup',()=>{ drag=null; });
+window.addEventListener('resize',()=>{ clampRoi(); drawRoi(); });
+
+/* ---------------- capture + parse ---------------- */
+const work = document.createElement('canvas'), wctx=work.getContext('2d',{willReadFrequently:true});
+function grabRoiCanvas(){
+  const vw=video.videoWidth, vh=video.videoHeight; if(!vw) return null;
+  const disp=camwrap.getBoundingClientRect();
+  const sx=vw/disp.width, sy=vh/disp.height;
+  const cx=roiBox.x*sx, cy=roiBox.y*sy, cw=roiBox.w*sx, ch=roiBox.h*sy;
+  const scale=Math.min(3, 1400/Math.max(1,cw));           // upscale small crops
+  work.width=Math.round(cw*scale); work.height=Math.round(ch*scale);
+  wctx.drawImage(video, cx,cy,cw,ch, 0,0,work.width,work.height);
+  // light greyscale + contrast to help OCR
+  const im=wctx.getImageData(0,0,work.width,work.height), d=im.data;
+  for(let i=0;i<d.length;i+=4){ let g=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]; g=(g-128)*1.35+128; g=g<0?0:g>255?255:g; d[i]=d[i+1]=d[i+2]=g; }
+  wctx.putImageData(im,0,0);
+  return work;
+}
+function normWeight(t){
+  t=(t||'').replace(/,/g,'.').replace(/[^0-9.]/g,'');
+  if(!t) return null;
+  if(t.indexOf('.')<0){ if(t.length<2) return null; t=t.slice(0,-1)+'.'+t.slice(-1); }
+  const v=parseFloat(t);
+  return (v>=5&&v<=1500)?Math.round(v*10)/10:null;
+}
+function numTok(t){ return /^\d{2,4}[.,]?\d?$/.test((t||'').trim()); }
+function wcx(w){ return (w.bbox.x0+w.bbox.x1)/2; }
+/* Assign Track 1 / Track 2 by word x-position; auto-detect 1- vs 2-track framing.
+   Index column (far left, or single digits) is ignored. */
+function parseFrame(data, W){
+  const words=(data.words||[]).filter(w=>w.bbox && numTok(w.text));
+  if(!words.length) return null;
+  const idxB=0.20*W;
+  const xs=words.map(wcx).filter(c=>c>idxB);
+  if(!xs.length) return null;
+  const mn=Math.min(...xs), mx=Math.max(...xs);
+  const two=(mx-mn)>0.25*W, split=(mn+mx)/2;
+  const cand=words.filter(w=>wcx(w)>idxB);
+  cand.sort((a,b)=>a.bbox.y0-b.bbox.y0);
+  const y0=cand[0].bbox.y0, pitch=Math.max(12,(cand[0].bbox.y1-cand[0].bbox.y0)*0.6);
+  const row=cand.filter(w=>Math.abs(w.bbox.y0-y0)<pitch);
+  let t1=null,t2=null;
+  for(const w of row){ const v=normWeight(w.text); if(v==null) continue;
+    if(!two){ if(t1==null) t1=v; }
+    else if(wcx(w)<split){ if(t1==null) t1=v; } else if(t2==null) t2=v; }
+  if(t1==null&&t2==null) return null;
+  return {t1,t2,raw:row.map(w=>w.text).join(' ')};
+}
+function samePortion(a,b){
+  if(!a||!b) return false;
+  const cmp=(x,y)=> (x==null||y==null)?true:Math.abs(x-y)<0.5;
+  if(a.t1==null&&a.t2==null) return false;
+  return cmp(a.t1,b.t1)&&cmp(a.t2,b.t2);
+}
+function commit(p){
+  const t=(performance.now()-startTs)/1000;
+  rows.push({t:t.toFixed(1), t1:p.t1, t2:p.t2, raw:p.raw});
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td>${rows.length}</td><td>${t.toFixed(1)}</td><td>${p.t1??''}</td><td>${p.t2??''}</td><td style="color:#7d8a89">${p.raw}</td>`;
+  $('log').prepend(tr); $('count').textContent=rows.length;
+}
+
+async function tick(){
+  if(!running) return;
+  const t0=performance.now();
+  const cv=grabRoiCanvas();
+  if(cv && worker){
+    $('pill').className='pill busy';
+    try{
+      const {data}=await worker.recognize(cv,{},{blocks:true});
+      const p=parseFrame(data, cv.width);
+      $('live').textContent = p ? (p.t1??'—')+(p.t2!=null?'  /  '+p.t2:'') : '—';
+      if(p){
+        if(samePortion(p,committed)){ /* same portion still on top */ }
+        else if(committed && samePortion(p,pending)){ pendingN++; if(pendingN>=2){ commit(p); committed=p; pending=null; pendingN=0; } }
+        else if(!committed){ commit(p); committed=p; }
+        else { pending=p; pendingN=1; }
+      }
+    }catch(e){ /* ignore a bad frame */ }
+    $('pill').className='pill on';
+  }
+  const clk=(performance.now()-startTs)/1000; $('clock').textContent=Math.floor(clk/60)+':'+String(Math.floor(clk%60)).padStart(2,'0');
+  const interval=1000/parseInt($('fps').value,10);
+  const wait=Math.max(0,interval-(performance.now()-t0));
+  loopTimer=setTimeout(tick,wait);
+}
+
+/* ---------------- start / stop / export ---------------- */
+$('startBtn').onclick=()=>{
+  const name=$('fname').value.trim();
+  if(!name){ $('fname').focus(); return; }
+  if(!video.videoWidth){ showErr('Camera not ready yet.'); return; }
+  running=true; startTs=performance.now(); committed=null; pending=null; pendingN=0;
+  $('startBtn').style.display='none'; $('stopBtn').style.display='block';
+  $('fname').disabled=true; tick();
+};
+$('stopBtn').onclick=()=>{
+  running=false; if(loopTimer)clearTimeout(loopTimer);
+  $('stopBtn').style.display='none'; $('startBtn').style.display='block';
+  $('fname').disabled=false; $('pill').className='pill';
+  if(rows.length) exportCSV();
+};
+function exportCSV(){
+  if(!rows.length){ return; }
+  const name=($('fname').value.trim()||'trial')+'.csv';
+  const head='index,elapsed_s,track1,track2,raw\n';
+  const body=rows.map((r,i)=>[i+1,r.t,r.t1??'',r.t2??'','"'+(r.raw||'').replace(/"/g,'""')+'"'].join(',')).join('\n');
+  const blob=new Blob([head+body],{type:'text/csv'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+$('exportBtn').onclick=exportCSV;
+$('clearBtn').onclick=()=>{ rows=[]; $('log').innerHTML=''; $('count').textContent='0'; committed=null; };
+
+/* ---------------- test hook (headless OCR validation) ---------------- */
+window.__ocrTest=async function(url){
+  const img=new Image(); img.crossOrigin='anonymous';
+  await new Promise((res,rej)=>{img.onload=res;img.onerror=rej;img.src=url;});
+  work.width=img.width; work.height=img.height; wctx.drawImage(img,0,0);
+  const {data}=await worker.recognize(work,{},{blocks:true});
+  return {text:data.text, parsedTop:parseFrame(data, work.width)};
+};
+
+/* ---------------- go ---------------- */
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
+initOCR();
+startCamera();
+</script>
+</body>
+</html>
