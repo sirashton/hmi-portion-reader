@@ -341,10 +341,20 @@ async function tick(){
   loopTimer=setTimeout(tick, Math.max(250, interval-(performance.now()-t0)));
 }
 
+let wakeLock=null;
+async function keepAwake(on){
+  try{
+    if(on && 'wakeLock' in navigator){ wakeLock=await navigator.wakeLock.request('screen'); }
+    else if(!on && wakeLock){ await wakeLock.release(); wakeLock=null; }
+  }catch(_){/* unsupported: user should disable screen sleep manually */}
+}
+document.addEventListener('visibilitychange',()=>{ if(running && document.visibilityState==='visible') keepAwake(true); });
+
 $('startBtn').onclick=()=>{
   const name=$('fname').value.trim();
   if(!name){ $('fname').focus(); return; }
   if(!video.videoWidth){ showErr(srcMode==='file'?'Video not loaded yet.':'Camera not ready yet.'); return; }
+  keepAwake(true);
   running=true; startTs=performance.now();
   if(srcMode==='file'){ if(video.ended||video.currentTime>=(video.duration||1e9)){ try{video.currentTime=0;}catch(_){}} video.play(); }
   $('startBtn').style.display='none'; $('stopBtn').style.display='block';
@@ -352,6 +362,7 @@ $('startBtn').onclick=()=>{
 };
 $('stopBtn').onclick=()=>{
   running=false; if(loopTimer)clearTimeout(loopTimer);
+  keepAwake(false);
   if(srcMode==='file') video.pause();
   $('stopBtn').style.display='none'; $('startBtn').style.display='block';
   $('fname').disabled=false; $('pill').className='pill';

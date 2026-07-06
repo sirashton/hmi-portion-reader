@@ -1,8 +1,7 @@
 /* HMI Portion Reader — offline service worker.
    Caches the app shell + vendored OCR engine so it runs with zero internet
    after the first load. Bump CACHE to force a refresh on update. */
-const CACHE = 'portion-reader-v5';   // bumped: v2 staged engine (auto-locate,
-                                     // glyph-bank reader, log/portion tracking)
+const CACHE = 'portion-reader-v6';   // v2.1: wake-lock + docs (see CHANGELOG.md)
 const ASSETS = [
   './',
   './index.html',
