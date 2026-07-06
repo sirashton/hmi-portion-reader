@@ -45,8 +45,20 @@ def find_headers(toks):
     return t1, t2
 
 
-def locate(frame):
-    """Return derotated frame + header positions in derotated coords, or None."""
+def _derotate(frame, ang, mid):
+    M = cv2.getRotationMatrix2D(mid, ang, 1.0)
+    rot = cv2.warpAffine(frame, M, (frame.shape[1], frame.shape[0]),
+                         flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+    return rot
+
+
+def locate(frame, cache=None):
+    """Find the list and derotate. Fresh call OCRs the frame to find the
+    Track1/Track2 headers; passing a prior call's `cache` reuses the angle and
+    header positions and skips the OCR (the list barely moves in a fixed-camera
+    video — this halves OCR work). Returns (rot, p1, p2, cache) or None."""
+    if cache is not None:
+        return _derotate(frame, cache['ang'], cache['mid']), cache['p1'], cache['p2'], cache
     toks = ocr_tokens(frame)
     t1, t2 = find_headers(toks)
     if not (t1 and t2):
@@ -62,7 +74,7 @@ def locate(frame):
         return (M[0, 0] * p[0] + M[0, 1] * p[1] + M[0, 2],
                 M[1, 0] * p[0] + M[1, 1] * p[1] + M[1, 2])
     p1, p2 = tx((t1['x'], t1['y'])), tx((t2['x'], t2['y']))
-    return rot, p1, p2
+    return rot, p1, p2, {'ang': ang, 'mid': mid, 'p1': p1, 'p2': p2}
 
 
 # ---------------------------------------------------------------- stage B
@@ -176,23 +188,25 @@ def read_index_cell(crop, y, half, x0, x1):
     return v if 1 <= v <= 40 else None
 
 
-def read_frame(frame):
-    """Full stage A+B for one frame -> list of blocks
-    [{'rows':[{'pn','t1','t2','iread'}], 'sep_below':bool}] or None."""
-    loc = locate(frame)
+def read_frame(frame, geo=None):
+    """Full stage A+B for one frame -> (blocks, geo). `geo` is the locate cache:
+    pass the previous frame's to skip the header-finding OCR pass. Returns
+    (blocks_or_None, geo_or_None) — geo is None only when locate itself failed
+    (caller should then re-locate fresh)."""
+    loc = locate(frame, geo)
     if not loc:
-        return None
-    rot, (x1, y1), (x2, y2) = loc
+        return None, None
+    rot, (x1, y1), (x2, y2), geo = loc
     col = x2 - x1
     if col < 25:
-        return None
+        return None, geo
     S = max(1.5, 620.0 / (col * 4))          # normalise so a column is ~155px
     H, W = rot.shape[:2]
     cx0 = max(0, int(x1 - 1.35 * col)); cx1 = min(W, int(x2 + 0.55 * col))
     cy0 = max(0, int(max(y1, y2) + 0.10 * col)); cy1 = min(H, int(max(y1, y2) + 4.9 * col))
     crop = rot[cy0:cy1, cx0:cx1]
     if crop.size == 0:
-        return None
+        return None, geo
     crop = cv2.resize(crop, None, fx=S, fy=S, interpolation=cv2.INTER_CUBIC)
     # column landmarks in crop coords
     cX1 = (x1 - cx0) * S; cX2 = (x2 - cx0) * S
@@ -203,7 +217,7 @@ def read_frame(frame):
             and tk['h'] < 0.5 * (cX2 - cX1)]
     nums.sort(key=lambda t: t['y'])
     if len(nums) < 3:
-        return None
+        return None, geo
     BANK.harvest(crop, nums[:24])       # keep the font templates fresh
     # cluster into rows
     med_h = statistics.median(t['h'] for t in nums)
@@ -215,7 +229,7 @@ def read_frame(frame):
         else:
             rows.append({'y': tk['y'], 'toks': [tk]})
     if len(rows) < 3:
-        return None
+        return None, geo
     pitch = statistics.median(rows[i + 1]['y'] - rows[i]['y'] for i in range(len(rows) - 1))
     # per-row weights + index cell read
     for r in rows:
@@ -257,7 +271,7 @@ def read_frame(frame):
                              'iread': r['iread']})
         out.append({'rows': rows_out, 'top_votes': dict(votes),
                     'is_last': bi == len(blocks) - 1})
-    return out
+    return out, geo
 
 
 # ---------------------------------------------------------------- stage C
@@ -399,6 +413,8 @@ def run(video, t0, t1, step, target, debug=False):
         plan.add(int(t * fps)); t += step / 4
     plan.add(int(end * fps) - 2)
     fidx = read_ok = 0
+    geo = None; since_fresh = 0
+    RELOC_EVERY = 12           # refresh the header locate at least this often
     for fno in sorted(p for p in plan if 0 <= p < nfr - 1):
         cap.set(cv2.CAP_PROP_POS_FRAMES, fno)
         ok, frame = cap.read()
@@ -408,7 +424,15 @@ def run(video, t0, t1, step, target, debug=False):
             frame = cv2.rotate(frame, rot)
         f = fno
         fidx += 1
-        blocks = read_frame(frame)
+        # reuse the cached header locate to skip an OCR pass; re-locate fresh
+        # every RELOC_EVERY frames, and immediately if a cached read comes back
+        # empty (camera drifted) so accuracy never quietly degrades.
+        if geo is not None and since_fresh < RELOC_EVERY:
+            blocks, _ = read_frame(frame, geo); since_fresh += 1
+            if blocks is None:
+                blocks, geo = read_frame(frame, None); since_fresh = 0
+        else:
+            blocks, geo = read_frame(frame, None); since_fresh = 0
         if blocks:
             read_ok += 1
             store.absorb(blocks, fidx)

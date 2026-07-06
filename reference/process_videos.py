@@ -85,7 +85,9 @@ def main():
     ap.add_argument('--prefix', default='', help='only videos whose filename starts with this')
     ap.add_argument('--target', type=float, default=None,
                     help='target portion weight in g (fallback: TrialLog.xlsx lookup)')
-    ap.add_argument('--step', type=float, default=2.0, help='sampling interval, seconds')
+    ap.add_argument('--step', type=float, default=4.0,
+                    help='sampling interval in seconds (default 4; portions stay on-screen '
+                         '~20-30s so this still gives 5+ confirmations. Lower = safer/slower)')
     ap.add_argument('--force', action='store_true', help='reprocess even if the CSV exists')
     a = ap.parse_args()
 
