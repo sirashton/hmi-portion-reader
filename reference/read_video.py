@@ -354,12 +354,35 @@ class LogStore:
                     break
 
 
+def detect_rotation(cap, nfr):
+    """Some clips are filmed landscape (rotation metadata lost): probe frames
+    and pick the rotation under which the Track headers can be located.
+    Returns a cv2.ROTATE_* code or None for as-is."""
+    for frac in (0.5, 0.25, 0.75):
+        cap.set(cv2.CAP_PROP_POS_FRAMES, int(nfr * frac))
+        ok, frame = cap.read()
+        if not ok:
+            continue
+        if locate(frame):
+            return None
+        for code in (cv2.ROTATE_90_CLOCKWISE, cv2.ROTATE_90_COUNTERCLOCKWISE,
+                     cv2.ROTATE_180):
+            if locate(cv2.rotate(frame, code)):
+                names = {cv2.ROTATE_90_CLOCKWISE: '90cw',
+                         cv2.ROTATE_90_COUNTERCLOCKWISE: '90ccw',
+                         cv2.ROTATE_180: '180'}
+                print(f'auto-rotation: {names[code]}', flush=True)
+                return code
+    return None
+
+
 def run(video, t0, t1, step, target, debug=False):
     cap = cv2.VideoCapture(video)
     fps = cap.get(cv2.CAP_PROP_FPS)
     nfr = cap.get(cv2.CAP_PROP_FRAME_COUNT)
     if t1 is None:
         t1 = nfr / fps
+    rot = detect_rotation(cap, nfr)
     store = LogStore()
     # sampling plan: uniform, plus densified start/end so boundary rows still
     # get >=2 genuine samples for the confirmation rule (dedup on frame no.)
@@ -381,6 +404,8 @@ def run(video, t0, t1, step, target, debug=False):
         ok, frame = cap.read()
         if not ok:
             break
+        if rot is not None:
+            frame = cv2.rotate(frame, rot)
         f = fno
         fidx += 1
         blocks = read_frame(frame)
