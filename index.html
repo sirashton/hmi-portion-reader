@@ -27,8 +27,24 @@
   .btn-stop{background:var(--reject);color:#fff;flex:1;}
   .btn-ghost{background:#fff;color:var(--ink);border:1px solid var(--grid);}
   button:disabled{opacity:.45;}
-  .camwrap{position:relative;width:100%;flex:1 1 auto;min-height:240px;background:#000;overflow:hidden;line-height:0;touch-action:none;}
+  .stage{display:flex;flex:1 1 auto;min-height:240px;align-items:stretch;background:#000;}
+  .camwrap{position:relative;flex:1 1 62%;min-width:0;min-height:240px;background:#000;overflow:hidden;line-height:0;touch-action:none;}
   .camwrap video{position:absolute;left:0;top:0;transform-origin:0 0;display:block;pointer-events:none;}
+  #ovl{position:absolute;left:0;top:0;pointer-events:none;z-index:4;}
+  .mirror{flex:1 1 38%;min-width:150px;max-width:46%;background:#f7f9f9;border-left:2px solid var(--ink);overflow:auto;
+          font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink);}
+  .mirror .mhead{position:sticky;top:0;display:flex;background:#eef3f2;border-bottom:2px solid var(--grid);
+                 font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
+  .mirror .mhead span{flex:1;padding:5px 6px;text-align:right;}
+  .mirror .mhead span:first-child{flex:0 0 34px;text-align:left;}
+  .mirror .mrow{display:flex;border-bottom:1px solid #eef2f1;}
+  .mirror .mrow span{flex:1;padding:3px 6px;text-align:right;}
+  .mirror .mrow span:first-child{flex:0 0 34px;text-align:left;color:var(--muted);font-weight:700;}
+  .mirror .msep{height:0;border-top:2px solid #b8c6c4;margin:3px 8px;}
+  .mirror .conf{color:var(--pos);font-weight:700;}
+  .mirror .unconf{color:#9aa8a6;}
+  .mirror .mnote{padding:8px;color:var(--muted);font-size:11px;}
+  @media(max-width:560px){ .stage{flex-direction:column;} .mirror{max-width:none;border-left:none;border-top:2px solid var(--ink);max-height:32vh;} }
   .zoomctl{position:absolute;left:8px;bottom:8px;display:flex;gap:6px;z-index:6;}
   .zoomctl button{width:40px;height:40px;border-radius:9px;border:none;background:rgba(42,59,58,.82);color:#fff;font-size:20px;font-weight:700;line-height:1;padding:0;}
   .zoomctl button[data-z=fit]{width:auto;padding:0 12px;font-size:12px;text-transform:uppercase;letter-spacing:.4px;}
@@ -82,13 +98,20 @@
   <input id="fileInput" type="file" accept="video/*" style="display:none">
 </div>
 
-<div class="camwrap" id="camwrap">
-  <video id="video" playsinline muted></video>
-  <div id="roi"><div class="tag">Limit reading to this area (optional)</div><div class="handle"></div></div>
-  <div class="zoomctl">
-    <button data-z="out" aria-label="Zoom out">−</button>
-    <button data-z="fit">Fit</button>
-    <button data-z="in" aria-label="Zoom in">+</button>
+<div class="stage">
+  <div class="camwrap" id="camwrap">
+    <video id="video" playsinline muted></video>
+    <canvas id="ovl"></canvas>
+    <div id="roi"><div class="tag">Limit reading to this area (optional)</div><div class="handle"></div></div>
+    <div class="zoomctl">
+      <button data-z="out" aria-label="Zoom out">−</button>
+      <button data-z="fit">Fit</button>
+      <button data-z="in" aria-label="Zoom in">+</button>
+    </div>
+  </div>
+  <div class="mirror" id="mirror">
+    <div class="mhead"><span>#</span><span>Track 1</span><span>Track 2</span></div>
+    <div class="mnote">What the reader currently sees will appear here — compare it against the HMI list on the left. <b>Green</b> = confirmed across frames, grey = awaiting confirmation.</div>
   </div>
 </div>
 
@@ -115,7 +138,10 @@
 </div>
 
 <div class="foot">
-  <button id="exportBtn" class="btn-ghost" style="flex:1">⬇ Download CSV</button>
+  <button id="exportBtn" class="btn-ghost" style="flex:1">⬇ CSV</button>
+  <button id="framesBtn" class="btn-ghost" style="flex:1" disabled>⬇ Frames (0)</button>
+  <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);font-weight:600;">
+    <input id="keepFrames" type="checkbox" checked>save frames</label>
   <button id="clearBtn" class="btn-ghost">Clear</button>
 </div>
 
@@ -204,7 +230,7 @@ window.addEventListener('resize',()=>{ fitVideo(); });
 
 /* ---------------- pan & zoom (viewing aid only) ---------------- */
 let zoom=1, panX=0, panY=0;
-function applyView(){ video.style.transform=`translate(${panX}px,${panY}px) scale(${zoom})`; if(maskOn) renderRoi(); }
+function applyView(){ video.style.transform=`translate(${panX}px,${panY}px) scale(${zoom})`; if(maskOn) renderRoi(); if(typeof drawOverlay==='function') drawOverlay(); }
 function fitVideo(){
   const vw=video.videoWidth, vh=video.videoHeight; if(!vw) return;
   const r=camwrap.getBoundingClientRect();
@@ -289,7 +315,23 @@ async function analyse(source, sw, sh, useMask){
   const geo2={x1:(geo.x1-x0)*K, x2:(geo.x2-x0)*K, single:geo.single};
   const blocks=ENGINE.buildBlocks(toks2, geo2, BANK, grabCell,
     (sx0,sx1)=>grabCell(sx0, 0, sx1, work.height));
+  // publish what this frame found, for the live overlay + HMI-mirror panel
+  LAST={ t:performance.now(), blocks,
+         box:{x0,y0,x1,y1}, cols:[geo.x1,geo.x2], single:geo.single,
+         m, k1, gw:geom.width, gh:geom.height, ang:cachedAngle };
   return blocks;
+}
+let LAST=null;
+/* map a pass-1 geom-canvas point back to SOURCE-video pixels (invert the
+   rotation about the geom centre, then unscale and un-offset the mask) */
+function geomToSrc(gx,gy){
+  if(!LAST) return {x:0,y:0};
+  const {m,k1,gw,gh,ang}=LAST, r=ang*Math.PI/180;
+  const cx=gw/2, cy=gh/2;
+  const dx=gx-cx, dy=gy-cy;
+  const rx=cx + dx*Math.cos(r) - dy*Math.sin(r);
+  const ry=cy + dx*Math.sin(r) + dy*Math.cos(r);
+  return { x:m.x + rx*(m.w/gw), y:m.y + ry*(m.h/gh) };
 }
 
 async function processSample(){
@@ -300,6 +342,104 @@ async function processSample(){
   sampleIdx++;
   STORE.absorb(blocks, sampleIdx);
   return blocks;
+}
+
+/* ---------------- frame archive (for later re-evaluation) ---------------- */
+const FRAMES=[];                     // {name, blob}
+const FRAME_CAP=1400;                // ~2h at 5s — memory backstop
+const fcap=document.createElement('canvas'), fcapCtx=fcap.getContext('2d');
+function captureFrame(){
+  if(!$('keepFrames').checked || FRAMES.length>=FRAME_CAP || !video.videoWidth) return;
+  fcap.width=video.videoWidth; fcap.height=video.videoHeight;
+  fcapCtx.drawImage(video,0,0);
+  const t=srcMode==='file' ? video.currentTime : (performance.now()-startTs)/1000;
+  const name=`${($('fname').value.trim()||'trial')}_f${String(FRAMES.length+1).padStart(4,'0')}_t${t.toFixed(1)}s.jpg`;
+  fcap.toBlob(b=>{ if(b){ FRAMES.push({name,blob:b});
+    const mb=FRAMES.reduce((s,f)=>s+f.blob.size,0)/1048576;
+    $('framesBtn').textContent=`⬇ Frames (${FRAMES.length}, ${mb.toFixed(0)}MB)`;
+    $('framesBtn').disabled=false; } },'image/jpeg',0.85);
+}
+/* minimal ZIP writer (stored entries, CRC32) — no libraries, stays offline */
+const CRC_T=(()=>{ const t=new Uint32Array(256);
+  for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1); t[n]=c>>>0; } return t; })();
+function crc32(u8){ let c=0xFFFFFFFF; for(let i=0;i<u8.length;i++) c=CRC_T[(c^u8[i])&0xFF]^(c>>>8); return (c^0xFFFFFFFF)>>>0; }
+async function buildZip(files){
+  const enc=new TextEncoder(), parts=[], central=[]; let off=0;
+  for(const f of files){
+    const data=new Uint8Array(await f.blob.arrayBuffer());
+    const name=enc.encode(f.name), crc=crc32(data);
+    const lh=new DataView(new ArrayBuffer(30));
+    lh.setUint32(0,0x04034b50,true); lh.setUint16(4,20,true); lh.setUint16(6,0,true);
+    lh.setUint16(8,0,true); lh.setUint16(10,0,true); lh.setUint16(12,0,true);
+    lh.setUint32(14,crc,true); lh.setUint32(18,data.length,true); lh.setUint32(22,data.length,true);
+    lh.setUint16(26,name.length,true); lh.setUint16(28,0,true);
+    parts.push(lh.buffer,name,data);
+    const ch=new DataView(new ArrayBuffer(46));
+    ch.setUint32(0,0x02014b50,true); ch.setUint16(4,20,true); ch.setUint16(6,20,true);
+    ch.setUint32(16,crc,true); ch.setUint32(20,data.length,true); ch.setUint32(24,data.length,true);
+    ch.setUint16(28,name.length,true); ch.setUint32(42,off,true);
+    central.push({h:ch.buffer,name});
+    off+=30+name.length+data.length;
+  }
+  const cdStart=off; let cdLen=0;
+  for(const c of central){ parts.push(c.h,c.name); cdLen+=46+c.name.length; }
+  const e=new DataView(new ArrayBuffer(22));
+  e.setUint32(0,0x06054b50,true); e.setUint16(8,central.length,true); e.setUint16(10,central.length,true);
+  e.setUint32(12,cdLen,true); e.setUint32(16,cdStart,true);
+  parts.push(e.buffer);
+  return new Blob(parts,{type:'application/zip'});
+}
+$('framesBtn').onclick=async()=>{
+  if(!FRAMES.length) return;
+  $('framesBtn').disabled=true; const old=$('framesBtn').textContent; $('framesBtn').textContent='zipping…';
+  try{
+    const zip=await buildZip(FRAMES);
+    const a=document.createElement('a'); a.href=URL.createObjectURL(zip);
+    a.download=($('fname').value.trim()||'trial')+'_frames.zip'; a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+  } finally { $('framesBtn').textContent=old; $('framesBtn').disabled=false; }
+};
+
+/* ---------------- live visual confirmation: overlay + HMI mirror ---------------- */
+const ovl=$('ovl'), octx=ovl.getContext('2d');
+function drawOverlay(){
+  const r=camwrap.getBoundingClientRect();
+  if(ovl.width!==Math.round(r.width)||ovl.height!==Math.round(r.height)){
+    ovl.width=Math.round(r.width); ovl.height=Math.round(r.height);
+  }
+  octx.clearRect(0,0,ovl.width,ovl.height);
+  if(!LAST||!video.videoWidth) return;
+  const stale=(performance.now()-LAST.t) > 3.5*parseFloat($('step').value)*1000;
+  const map=(gx,gy)=>{ const s=geomToSrc(gx,gy); const b=srcToScreen({x:s.x,y:s.y,w:0,h:0}); return {x:b.x,y:b.y}; };
+  const {box,cols}=LAST;
+  const cn=[[box.x0,box.y0],[box.x1,box.y0],[box.x1,box.y1],[box.x0,box.y1]].map(p=>map(p[0],p[1]));
+  const colr= stale?'rgba(150,160,158,.85)':'rgba(15,113,115,.95)';
+  octx.strokeStyle=colr; octx.lineWidth=2; octx.setLineDash([]);
+  octx.beginPath(); cn.forEach((p,i)=> i?octx.lineTo(p.x,p.y):octx.moveTo(p.x,p.y)); octx.closePath(); octx.stroke();
+  octx.setLineDash([5,4]); octx.lineWidth=1.2;
+  for(const cx of cols){ const a=map(cx,box.y0), b=map(cx,box.y1);
+    octx.beginPath(); octx.moveTo(a.x,a.y); octx.lineTo(b.x,b.y); octx.stroke(); }
+  octx.setLineDash([]); octx.fillStyle=colr; octx.font='700 10px sans-serif';
+  octx.fillText(stale?'list (stale)':'list found', cn[0].x+4, cn[0].y-5);
+}
+function renderMirror(){
+  if(!LAST||!LAST.blocks) return;
+  const conf=new Set();
+  for(const log of STORE.logs) for(const k in log.obs){
+    const [val,n]=topOf(log.obs[k]); if(n>=2) conf.add(k+':'+val);
+  }
+  let h='<div class="mhead"><span>#</span><span>Track 1</span><span>Track 2</span></div>';
+  LAST.blocks.forEach((b,bi)=>{
+    if(bi) h+='<div class="msep"></div>';
+    for(const r of b.rows){
+      const c1=r.t1!=null && conf.has('1:'+r.pn+':'+r.t1);
+      const c2=r.t2!=null && conf.has('2:'+r.pn+':'+r.t2);
+      h+=`<div class="mrow"><span>${r.pn??'·'}</span>`+
+         `<span class="${r.t1==null?'':(c1?'conf':'unconf')}">${r.t1==null?'':r.t1.toFixed(1)}</span>`+
+         `<span class="${r.t2==null?'':(c2?'conf':'unconf')}">${r.t2==null?'':r.t2.toFixed(1)}</span></div>`;
+    }
+  });
+  $('mirror').innerHTML=h;
 }
 
 /* ---------------- live table ---------------- */
@@ -325,13 +465,15 @@ async function tick(){
   if(!running) return;
   const t0=performance.now();
   $('pill').className='pill busy';
+  captureFrame();                 // archive the frame exactly as sampled
   try{
     const blocks=await processSample();
     if(blocks){
       const top=blocks[0]&&blocks[0].rows[0];
       $('live').textContent = top ? `pn${top.pn??'?'}  ${top.t1??'—'} / ${top.t2??'—'}` : '—';
-      refreshTable();
+      refreshTable(); renderMirror();
     } else $('live').textContent='searching…';
+    drawOverlay();
   }catch(e){ /* skip a bad frame */ }
   $('pill').className='pill on';
   $('fcount').textContent=sampleIdx;
@@ -386,7 +528,7 @@ function exportCSV(){
   setTimeout(()=>URL.revokeObjectURL(a.href),2000);
 }
 $('exportBtn').onclick=exportCSV;
-$('clearBtn').onclick=()=>{ STORE=new LogStore(); BANK=new GlyphBank(); sampleIdx=0; cachedAngle=0; $('log').innerHTML=''; $('count').textContent='0'; $('logcount').textContent='0'; $('fcount').textContent='0'; };
+$('clearBtn').onclick=()=>{ STORE=new LogStore(); BANK=new GlyphBank(); sampleIdx=0; cachedAngle=0; LAST=null; FRAMES.length=0; $('framesBtn').textContent='⬇ Frames (0)'; $('framesBtn').disabled=true; $('log').innerHTML=''; $('count').textContent='0'; $('logcount').textContent='0'; $('fcount').textContent='0'; drawOverlay(); };
 
 /* ---------------- test hooks (headless validation) ---------------- */
 window.__engineFrame=async function(url){
