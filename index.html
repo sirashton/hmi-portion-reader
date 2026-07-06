@@ -19,7 +19,8 @@
   header .sub{font-size:11px;opacity:.7;margin-top:2px;}
   .controls{padding:10px 12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--panel);border-bottom:1px solid var(--grid);}
   .controls label{font-size:12px;color:var(--muted);font-weight:600;}
-  input[type=text]{flex:1;min-width:120px;padding:9px 10px;border:1px solid var(--grid);border-radius:8px;font-size:15px;color:var(--ink);}
+  input[type=text]{flex:1;min-width:110px;padding:9px 10px;border:1px solid var(--grid);border-radius:8px;font-size:15px;color:var(--ink);}
+  input[type=number]{width:70px;padding:9px 8px;border:1px solid var(--grid);border-radius:8px;font-size:14px;color:var(--ink);}
   select{padding:9px 8px;border:1px solid var(--grid);border-radius:8px;font-size:14px;background:#fff;color:var(--ink);}
   button{border:none;border-radius:8px;padding:10px 14px;font-size:14px;font-weight:700;cursor:pointer;}
   .btn-go{background:var(--pos);color:#fff;flex:1;}
@@ -27,27 +28,28 @@
   .btn-ghost{background:#fff;color:var(--ink);border:1px solid var(--grid);}
   button:disabled{opacity:.45;}
   .camwrap{position:relative;width:100%;flex:1 1 auto;min-height:240px;background:#000;overflow:hidden;line-height:0;touch-action:none;}
-  .coordrow{gap:6px;padding:7px 12px;}
-  .coordrow .cl{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;}
-  .coordrow label{display:flex;align-items:center;gap:3px;font-size:12px;font-weight:600;color:var(--muted);}
-  .coordrow input{width:58px;padding:6px 6px;border:1px solid var(--grid);border-radius:7px;font-size:14px;font-variant-numeric:tabular-nums;color:var(--ink);}
   .camwrap video{position:absolute;left:0;top:0;transform-origin:0 0;display:block;pointer-events:none;}
   .zoomctl{position:absolute;left:8px;bottom:8px;display:flex;gap:6px;z-index:6;}
   .zoomctl button{width:40px;height:40px;border-radius:9px;border:none;background:rgba(42,59,58,.82);color:#fff;font-size:20px;font-weight:700;line-height:1;padding:0;}
   .zoomctl button[data-z=fit]{width:auto;padding:0 12px;font-size:12px;text-transform:uppercase;letter-spacing:.4px;}
-  #roi{position:absolute;border:2px solid var(--pos);box-shadow:0 0 0 9999px rgba(0,0,0,.35);border-radius:4px;touch-action:none;cursor:move;z-index:5;}
+  #roi{position:absolute;border:2px dashed var(--pos);border-radius:4px;touch-action:none;cursor:move;z-index:5;display:none;}
   #roi .handle{position:absolute;width:26px;height:26px;right:-13px;bottom:-13px;background:var(--pos);border:3px solid #fff;border-radius:50%;touch-action:none;}
   #roi .tag{position:absolute;top:-22px;left:0;background:var(--pos);color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;line-height:1.3;white-space:nowrap;}
   .readout{padding:10px 12px;background:var(--panel);border-bottom:1px solid var(--grid);display:flex;gap:14px;align-items:baseline;flex-wrap:wrap;}
-  .readout .big{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--pos);}
+  .readout .big{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--pos);}
   .readout .lbl{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;}
   .stat{font-size:12px;color:var(--muted);}
   .stat b{color:var(--ink);}
-  .logwrap{flex:0 0 auto;max-height:26vh;overflow:auto;background:var(--panel);}
+  .coordrow{gap:6px;padding:7px 12px;}
+  .coordrow .cl{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;}
+  .coordrow label{display:flex;align-items:center;gap:3px;font-size:12px;font-weight:600;color:var(--muted);}
+  .coordrow input{width:58px;padding:6px 6px;border:1px solid var(--grid);border-radius:7px;font-size:14px;font-variant-numeric:tabular-nums;color:var(--ink);}
+  .logwrap{flex:0 0 auto;max-height:30vh;overflow:auto;background:var(--panel);}
   table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums;}
   th,td{padding:6px 10px;text-align:right;border-bottom:1px solid var(--grid);}
   th:first-child,td:first-child{text-align:left;}
   thead th{position:sticky;top:0;background:#eef3f2;color:var(--muted);font-size:11px;text-transform:uppercase;z-index:1;}
+  td.flag{color:var(--reject);font-weight:700;}
   .foot{padding:8px 12px;display:flex;gap:8px;background:var(--panel);border-top:1px solid var(--grid);}
   .banner{padding:10px 12px;font-size:13px;background:#fff4d6;color:#6b5300;border-bottom:1px solid #e8d98a;}
   .banner.err{background:#fdecec;color:#a11;border-color:#f2b8b8;}
@@ -57,29 +59,32 @@
 </head>
 <body>
 <header>
-  <h1>Portion Reader <span style="opacity:.6;font-weight:400">· MVP</span></h1>
-  <div class="sub">On-device screen reader — logs portion weights to CSV. Nothing leaves this device.</div>
+  <h1>Portion Reader <span style="opacity:.6;font-weight:400">· v2 staged engine</span></h1>
+  <div class="sub">On-device screen reader — auto-locates the list, reads logs/portions/weights, confirms across frames. Nothing leaves this device.</div>
 </header>
 
 <div id="banner" class="banner">Loading on-device OCR… (installs for offline use on first load)</div>
 
 <div class="controls">
-  <label for="fname">CSV</label>
+  <label for="fname">Trial</label>
   <input id="fname" type="text" value="trial_1" autocomplete="off" spellcheck="false">
-  <label for="fps">fps</label>
-  <select id="fps"><option>1</option><option selected>2</option><option>3</option></select>
+  <label for="target">Target g</label>
+  <input id="target" type="number" inputmode="decimal" placeholder="667">
+  <label for="step">every</label>
+  <select id="step"><option value="2">2s</option><option value="3" selected>3s</option><option value="5">5s</option></select>
 </div>
 <div class="controls" style="border-bottom:none;padding-top:0;">
   <button id="startBtn" class="btn-go" disabled>▶ Start</button>
   <button id="stopBtn" class="btn-stop" style="display:none">■ Stop</button>
   <button id="camBtn" class="btn-ghost">⟲ Camera</button>
   <button id="videoBtn" class="btn-ghost">📁 Video</button>
+  <button id="maskBtn" class="btn-ghost">▦ Mask</button>
   <input id="fileInput" type="file" accept="video/*" style="display:none">
 </div>
 
 <div class="camwrap" id="camwrap">
   <video id="video" playsinline muted></video>
-  <div id="roi"><div class="tag">Frame the number list</div><div class="handle"></div></div>
+  <div id="roi"><div class="tag">Limit reading to this area (optional)</div><div class="handle"></div></div>
   <div class="zoomctl">
     <button data-z="out" aria-label="Zoom out">−</button>
     <button data-z="fit">Fit</button>
@@ -87,8 +92,8 @@
   </div>
 </div>
 
-<div class="controls coordrow">
-  <span class="cl">Box&nbsp;(px)</span>
+<div class="controls coordrow" id="coordrow" style="display:none">
+  <span class="cl">Mask&nbsp;(px)</span>
   <label>X<input id="rx" type="number" inputmode="numeric" autocomplete="off"></label>
   <label>Y<input id="ry" type="number" inputmode="numeric" autocomplete="off"></label>
   <label>W<input id="rw" type="number" inputmode="numeric" autocomplete="off"></label>
@@ -96,14 +101,15 @@
 </div>
 
 <div class="readout">
-  <div><div class="lbl"><span id="pill" class="pill"></span>Live read</div><div class="big" id="live">—</div></div>
-  <div class="stat">Logged: <b id="count">0</b></div>
+  <div><div class="lbl"><span id="pill" class="pill"></span>Last frame</div><div class="big" id="live">—</div></div>
+  <div class="stat">Confirmed: <b id="count">0</b> portions · <b id="logcount">0</b> logs</div>
+  <div class="stat">Frames: <b id="fcount">0</b></div>
   <div class="stat">Time: <b id="clock">0:00</b></div>
 </div>
 
 <div class="logwrap">
   <table>
-    <thead><tr><th>#</th><th>t (s)</th><th>Track 1</th><th>Track 2</th><th>raw</th></tr></thead>
+    <thead><tr><th>Log</th><th>Pn</th><th>Track 1</th><th>Track 2</th><th>seen</th></tr></thead>
     <tbody id="log"></tbody>
   </table>
 </div>
@@ -114,36 +120,34 @@
 </div>
 
 <script src="tess/tesseract.min.js"></script>
+<script src="pipeline.js"></script>
+<script src="engine.js"></script>
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
 const video=$('video'), roi=$('roi'), camwrap=$('camwrap'), banner=$('banner');
 let worker=null, stream=null, running=false, loopTimer=null, startTs=0, srcMode='camera';
-let rows=[];            // committed log rows
-let committed=null;     // {t1,t2} of the portion currently on top
-let pending=null, pendingN=0;
+let BANK=new GlyphBank(), STORE=new LogStore();
+let sampleIdx=0, cachedAngle=0;
 
 /* ---------------- OCR init ---------------- */
 async function initOCR(){
   try{
-    const TB = new URL('tess/', location.href).href;   // absolute — worker importScripts needs it
+    const TB = new URL('tess/', location.href).href;
     worker = await Tesseract.createWorker('eng', 1, {
-      workerPath: TB+'worker.min.js',
-      corePath: TB,
-      langPath: TB,
-      cacheMethod:'none'
+      workerPath: TB+'worker.min.js', corePath: TB, langPath: TB, cacheMethod:'none'
     });
     await worker.setParameters({
       tessedit_char_whitelist:'0123456789. ',
-      tessedit_pageseg_mode:'6',        // assume a uniform block of text
+      tessedit_pageseg_mode:'6',
     });
     banner.style.display='none';
     $('startBtn').disabled=false;
-  }catch(e){ showErr('Could not load OCR engine: '+e.message); }
+  }catch(e){ showErr('Could not load OCR engine: '+(e&&e.message||e)); }
 }
 function showErr(m){ banner.className='banner err'; banner.style.display='block'; banner.textContent=m; }
 
-/* ---------------- camera ---------------- */
+/* ---------------- camera / video-file source ---------------- */
 let facing='environment';
 async function startCamera(){
   if(stream) stream.getTracks().forEach(t=>t.stop());
@@ -154,8 +158,6 @@ async function startCamera(){
   }catch(e){ showErr('Camera error: '+e.message+'  (a phone needs the page served over HTTPS)'); }
 }
 $('camBtn').onclick=()=>{ srcMode='camera'; video.removeAttribute('src'); video.load(); facing = facing==='environment'?'user':'environment'; startCamera(); };
-
-/* ---------------- video-file source ---------------- */
 $('videoBtn').onclick=()=>$('fileInput').click();
 $('fileInput').onchange=e=>{
   const f=e.target.files&&e.target.files[0]; if(!f) return;
@@ -165,14 +167,14 @@ $('fileInput').onchange=e=>{
   video.src=URL.createObjectURL(f);
   video.onloadeddata=()=>{ video.pause(); try{video.currentTime=0;}catch(_){}} ;
   video.onloadedmetadata=()=>{ fitVideo(); placeRoiDefault(); banner.style.display='none'; };
-  $('live').textContent='—';
 };
 video.addEventListener('ended',()=>{ if(running && srcMode==='file') $('stopBtn').click(); });
 
-/* ---------------- ROI — canonical in SOURCE pixels (so tests are repeatable) ---------------- */
-let roiSrc={x:0,y:0,w:0,h:0};   // region of the video frame, in source pixels (the truth)
-let roiBox={x:0,y:0,w:0,h:0};   // its on-screen rect, derived from roiSrc + current view
+/* ---------------- optional mask (source-pixel coords) ---------------- */
+let maskOn=false;
+let roiSrc={x:0,y:0,w:0,h:0}, roiBox={x:0,y:0,w:0,h:0};
 const CID=['rx','ry','rw','rh'];
+$('maskBtn').onclick=()=>{ maskOn=!maskOn; roi.style.display=maskOn?'block':'none'; $('coordrow').style.display=maskOn?'flex':'none'; $('maskBtn').style.background=maskOn?'#e8f2f2':'#fff'; if(maskOn) renderRoi(); };
 function vidRectCam(){ const c=camwrap.getBoundingClientRect(), v=video.getBoundingClientRect(); return {left:v.left-c.left, top:v.top-c.top, w:v.width}; }
 function srcToScreen(s){ const vr=vidRectCam(), k=vr.w/(video.videoWidth||1); return {x:vr.left+s.x*k, y:vr.top+s.y*k, w:s.w*k, h:s.h*k}; }
 function screenToSrc(b){ const vr=vidRectCam(), k=vr.w/(video.videoWidth||1); return {x:(b.x-vr.left)/k, y:(b.y-vr.top)/k, w:b.w/k, h:b.h/k}; }
@@ -181,8 +183,8 @@ function clampSrc(){ const vw=video.videoWidth||1, vh=video.videoHeight||1;
   roiSrc.x=Math.max(0,Math.min(roiSrc.x,vw-roiSrc.w)); roiSrc.y=Math.max(0,Math.min(roiSrc.y,vh-roiSrc.h)); }
 function styleRoi(){ roi.style.left=roiBox.x+'px';roi.style.top=roiBox.y+'px';roi.style.width=roiBox.w+'px';roi.style.height=roiBox.h+'px'; }
 function syncCoordInputs(){ const a=document.activeElement; if(a&&CID.includes(a.id)) return; $('rx').value=Math.round(roiSrc.x);$('ry').value=Math.round(roiSrc.y);$('rw').value=Math.round(roiSrc.w);$('rh').value=Math.round(roiSrc.h); }
-function renderRoi(){ if(!video.videoWidth) return; roiBox=srcToScreen(roiSrc); styleRoi(); syncCoordInputs(); }   // src -> screen box
-function placeRoiDefault(){ const vw=video.videoWidth||480, vh=video.videoHeight||850; roiSrc={x:Math.round(vw*0.30),y:Math.round(vh*0.22),w:Math.round(vw*0.45),h:Math.round(vh*0.50)}; renderRoi(); }
+function renderRoi(){ if(!video.videoWidth) return; roiBox=srcToScreen(roiSrc); styleRoi(); syncCoordInputs(); }
+function placeRoiDefault(){ const vw=video.videoWidth||480, vh=video.videoHeight||850; roiSrc={x:Math.round(vw*0.05),y:Math.round(vh*0.08),w:Math.round(vw*0.9),h:Math.round(vh*0.62)}; renderRoi(); }
 CID.forEach(id=>$(id).addEventListener('change',()=>{ roiSrc={x:+$('rx').value||0,y:+$('ry').value||0,w:+$('rw').value||0,h:+$('rh').value||0}; clampSrc(); renderRoi(); }));
 
 let drag=null;
@@ -200,13 +202,13 @@ roi.addEventListener('pointermove',e=>{
 roi.addEventListener('pointerup',()=>{ if(drag){ drag=null; renderRoi(); } });
 window.addEventListener('resize',()=>{ fitVideo(); });
 
-/* ---------------- pan & zoom the video (pinch / drag / buttons / wheel) ---------------- */
+/* ---------------- pan & zoom (viewing aid only) ---------------- */
 let zoom=1, panX=0, panY=0;
-function applyView(){ video.style.transform=`translate(${panX}px,${panY}px) scale(${zoom})`; renderRoi(); }
+function applyView(){ video.style.transform=`translate(${panX}px,${panY}px) scale(${zoom})`; if(maskOn) renderRoi(); }
 function fitVideo(){
   const vw=video.videoWidth, vh=video.videoHeight; if(!vw) return;
   const r=camwrap.getBoundingClientRect();
-  const base=Math.min(r.width/vw, r.height/vh);           // contain — never stretch
+  const base=Math.min(r.width/vw, r.height/vh);
   video.style.width=(vw*base)+'px'; video.style.height=(vh*base)+'px';
   zoom=1; panX=(r.width-vw*base)/2; panY=(r.height-vh*base)/2; applyView();
 }
@@ -224,100 +226,127 @@ camwrap.addEventListener('pointermove',e=>{ if(!pts.has(e.pointerId)) return; pt
 function endPtr(e){ pts.delete(e.pointerId); lastMid=null; lastDist=null; }
 camwrap.addEventListener('pointerup',endPtr); camwrap.addEventListener('pointercancel',endPtr);
 
-/* ---------------- capture + parse ---------------- */
-const work = document.createElement('canvas'), wctx=work.getContext('2d',{willReadFrequently:true});
-function grabRoiCanvas(){
-  const vw=video.videoWidth, vh=video.videoHeight; if(!vw) return null;
-  // capture straight from the source-pixel ROI — independent of pan/zoom, so repeatable
-  let cx=Math.max(0,Math.min(roiSrc.x,vw-1)), cy=Math.max(0,Math.min(roiSrc.y,vh-1));
-  let cw=Math.min(roiSrc.w,vw-cx), ch=Math.min(roiSrc.h,vh-cy);
-  if(cw<=1||ch<=1) return null;                            // ROI off the video
-  const scale=Math.min(3, 1400/Math.max(1,cw));            // upscale small crops
-  work.width=Math.round(cw*scale); work.height=Math.round(ch*scale);
-  wctx.drawImage(video, cx,cy,cw,ch, 0,0,work.width,work.height);
-  // light greyscale + contrast to help OCR
-  const im=wctx.getImageData(0,0,work.width,work.height), d=im.data;
-  for(let i=0;i<d.length;i+=4){ let g=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]; g=(g-128)*1.35+128; g=g<0?0:g>255?255:g; d[i]=d[i+1]=d[i+2]=g; }
-  wctx.putImageData(im,0,0);
-  return work;
-}
-function normWeight(t){
-  t=(t||'').replace(/,/g,'.').replace(/[^0-9.]/g,'');
-  if(!t) return null;
-  if(t.indexOf('.')<0){ if(t.length<2) return null; t=t.slice(0,-1)+'.'+t.slice(-1); }
-  const v=parseFloat(t);
-  return (v>=5&&v<=1500)?Math.round(v*10)/10:null;
-}
-function numTok(t){ return /^\d{2,4}[.,]?\d?$/.test((t||'').trim()); }
-function wcx(w){ return (w.bbox.x0+w.bbox.x1)/2; }
-/* Assign Track 1 / Track 2 by word x-position; auto-detect 1- vs 2-track framing.
-   Index column (far left, or single digits) is ignored. */
-function parseFrame(data, W){
-  const words=(data.words||[]).filter(w=>w.bbox && numTok(w.text));
-  if(!words.length) return null;
-  const idxB=0.20*W;
-  const xs=words.map(wcx).filter(c=>c>idxB);
-  if(!xs.length) return null;
-  const mn=Math.min(...xs), mx=Math.max(...xs);
-  const two=(mx-mn)>0.25*W, split=(mn+mx)/2;
-  const cand=words.filter(w=>wcx(w)>idxB);
-  cand.sort((a,b)=>a.bbox.y0-b.bbox.y0);
-  const y0=cand[0].bbox.y0, pitch=Math.max(12,(cand[0].bbox.y1-cand[0].bbox.y0)*0.6);
-  const row=cand.filter(w=>Math.abs(w.bbox.y0-y0)<pitch);
-  let t1=null,t2=null;
-  for(const w of row){ const v=normWeight(w.text); if(v==null) continue;
-    if(!two){ if(t1==null) t1=v; }
-    else if(wcx(w)<split){ if(t1==null) t1=v; } else if(t2==null) t2=v; }
-  if(t1==null&&t2==null) return null;
-  return {t1,t2,raw:row.map(w=>w.text).join(' ')};
-}
-function samePortion(a,b){
-  if(!a||!b) return false;
-  const cmp=(x,y)=> (x==null||y==null)?true:Math.abs(x-y)<0.5;
-  if(a.t1==null&&a.t2==null) return false;
-  return cmp(a.t1,b.t1)&&cmp(a.t2,b.t2);
-}
-function nowT(){ return srcMode==='file' ? (video.currentTime||0) : (performance.now()-startTs)/1000; }
-function commit(p){
-  const t=nowT();
-  rows.push({t:t.toFixed(1), t1:p.t1, t2:p.t2, raw:p.raw});
-  const tr=document.createElement('tr');
-  tr.innerHTML=`<td>${rows.length}</td><td>${t.toFixed(1)}</td><td>${p.t1??''}</td><td>${p.t2??''}</td><td style="color:#7d8a89">${p.raw}</td>`;
-  $('log').prepend(tr); $('count').textContent=rows.length;
+/* ---------------- staged engine: one sample ---------------- */
+const work=document.createElement('canvas'), wctx=work.getContext('2d',{willReadFrequently:true});
+
+function grabCell(x0,y0,x1,y1){
+  x0=Math.max(0,Math.round(x0)); y0=Math.max(0,Math.round(y0));
+  x1=Math.min(work.width,Math.round(x1)); y1=Math.min(work.height,Math.round(y1));
+  if(x1-x0<4||y1-y0<4) return null;
+  return wctx.getImageData(x0,y0,x1-x0,y1-y0);
 }
 
+/* Two-pass sample, mirroring the Python reference:
+   pass 1 (geometry): OCR the whole (masked) source -> angle + weight columns
+   pass 2 (read):     OCR a derotated, upscaled crop of just the list region */
+const geom=document.createElement('canvas'), gctx=geom.getContext('2d',{willReadFrequently:true});
+
+async function ocrCanvas(cv){
+  const {data}=await worker.recognize(cv,{},{blocks:true});
+  return (data.words||[]).filter(w=>w.bbox).map(w=>({
+    text:(w.text||'').trim(), x:w.bbox.x0, y:w.bbox.y0,
+    w:w.bbox.x1-w.bbox.x0, h:w.bbox.y1-w.bbox.y0 }));
+}
+
+async function analyse(source, sw, sh, useMask){
+  source=source||video; sw=sw||video.videoWidth; sh=sh||video.videoHeight;
+  if(!sw) return null;
+  const m = (useMask!==false && maskOn) ? roiSrc : {x:0,y:0,w:sw,h:sh};
+  // ---- pass 1: geometry at ~1000px width
+  const k1=Math.max(0.8, Math.min(2.4, 1000/m.w));
+  geom.width=Math.round(m.w*k1); geom.height=Math.round(m.h*k1);
+  gctx.save(); gctx.fillStyle='#fff'; gctx.fillRect(0,0,geom.width,geom.height);
+  gctx.translate(geom.width/2,geom.height/2); gctx.rotate(-cachedAngle*Math.PI/180);
+  gctx.translate(-geom.width/2,-geom.height/2);
+  gctx.drawImage(source,m.x,m.y,m.w,m.h,0,0,geom.width,geom.height); gctx.restore();
+  let toks=await ocrCanvas(geom);
+  const ang=ENGINE.baselineAngle(toks)*180/Math.PI;
+  if(Math.abs(ang)>1.2 && Math.abs(cachedAngle+ang)<10){ cachedAngle+=ang; return analyse(source,sw,sh,useMask); }
+  const geo=ENGINE.findColumns(toks);
+  if(!geo) return null;
+  const col=geo.x2-geo.x1;
+  const NUMRE=/^\d{2,4}[.,]?\d?$/;
+  const ys=toks.filter(t=>NUMRE.test(t.text)&&t.x+t.w/2>geo.x1-0.6*col).map(t=>t.y);
+  if(!ys.length) return null;
+  const y0=Math.max(0,Math.min(...ys)-18), y1=Math.min(geom.height,Math.max(...ys)+42);
+  const x0=Math.max(0,geo.x1-1.55*col), x1=Math.min(geom.width,geo.x2+0.75*col);
+  // ---- pass 2: redraw the crop FROM THE VIDEO through the same transform
+  // (keeps full source resolution), upscaled so a column is ~150px wide
+  const K=Math.max(1.0, Math.min(3.5, 150/col));
+  work.width=Math.round((x1-x0)*K); work.height=Math.round((y1-y0)*K);
+  wctx.save();
+  wctx.imageSmoothingEnabled=true; wctx.imageSmoothingQuality='high';
+  wctx.fillStyle='#fff'; wctx.fillRect(0,0,work.width,work.height);
+  wctx.scale(K,K); wctx.translate(-x0,-y0);
+  wctx.translate(geom.width/2,geom.height/2);
+  wctx.rotate(-cachedAngle*Math.PI/180);
+  wctx.translate(-geom.width/2,-geom.height/2);
+  wctx.scale(geom.width/m.w, geom.height/m.h);
+  wctx.translate(-m.x,-m.y);
+  wctx.drawImage(source,0,0);
+  wctx.restore();
+  const toks2=await ocrCanvas(work);
+  const geo2={x1:(geo.x1-x0)*K, x2:(geo.x2-x0)*K, single:geo.single};
+  const blocks=ENGINE.buildBlocks(toks2, geo2, BANK, grabCell,
+    (sx0,sx1)=>grabCell(sx0, 0, sx1, work.height));
+  return blocks;
+}
+
+async function processSample(){
+  if(sampleIdx===0){ await analyse(); }   // warm-up: first pass only harvests
+                                          // the glyph bank; re-read before absorbing
+  const blocks=await analyse();
+  if(!blocks) return null;
+  sampleIdx++;
+  STORE.absorb(blocks, sampleIdx);
+  return blocks;
+}
+
+/* ---------------- live table ---------------- */
+function refreshTable(){
+  const rows=STORE.emit($('fname').value.trim()||'trial', parseFloat($('target').value)||null);
+  const tb=$('log'); tb.innerHTML='';
+  for(let i=rows.length-1;i>=0;i--){
+    const r=rows[i];
+    const tr=document.createElement('tr');
+    const flag=r.note?' class="flag"':'';
+    tr.innerHTML=`<td>${r.log}${r.heel?' •':''}</td><td>${r.pn}</td>`+
+      `<td${r.track===1?flag:''}>${r.track===1?r.weight:''}</td>`+
+      `<td${r.track===2?flag:''}>${r.track===2?r.weight:''}</td><td>${r.noteN||''}</td>`;
+    tb.appendChild(tr);
+  }
+  $('count').textContent=rows.length;
+  $('logcount').textContent=new Set(rows.map(r=>r.log)).size;
+  return rows;
+}
+
+/* ---------------- run loop ---------------- */
 async function tick(){
   if(!running) return;
   const t0=performance.now();
-  const cv=grabRoiCanvas();
-  if(cv && worker){
-    $('pill').className='pill busy';
-    try{
-      const {data}=await worker.recognize(cv,{},{blocks:true});
-      const p=parseFrame(data, cv.width);
-      $('live').textContent = p ? (p.t1??'—')+(p.t2!=null?'  /  '+p.t2:'') : '—';
-      if(p){
-        if(samePortion(p,committed)){ /* same portion still on top */ }
-        else if(committed && samePortion(p,pending)){ pendingN++; if(pendingN>=2){ commit(p); committed=p; pending=null; pendingN=0; } }
-        else if(!committed){ commit(p); committed=p; }
-        else { pending=p; pendingN=1; }
-      }
-    }catch(e){ /* ignore a bad frame */ }
-    $('pill').className='pill on';
-  }
-  const clk=nowT(); $('clock').textContent=Math.floor(clk/60)+':'+String(Math.floor(clk%60)).padStart(2,'0');
-  const interval=1000/parseInt($('fps').value,10);
-  const wait=Math.max(0,interval-(performance.now()-t0));
-  loopTimer=setTimeout(tick,wait);
+  $('pill').className='pill busy';
+  try{
+    const blocks=await processSample();
+    if(blocks){
+      const top=blocks[0]&&blocks[0].rows[0];
+      $('live').textContent = top ? `pn${top.pn??'?'}  ${top.t1??'—'} / ${top.t2??'—'}` : '—';
+      refreshTable();
+    } else $('live').textContent='searching…';
+  }catch(e){ /* skip a bad frame */ }
+  $('pill').className='pill on';
+  $('fcount').textContent=sampleIdx;
+  const clk=(srcMode==='file'?video.currentTime:(performance.now()-startTs)/1000);
+  $('clock').textContent=Math.floor(clk/60)+':'+String(Math.floor(clk%60)).padStart(2,'0');
+  const interval=parseFloat($('step').value)*1000;
+  loopTimer=setTimeout(tick, Math.max(250, interval-(performance.now()-t0)));
 }
 
-/* ---------------- start / stop / export ---------------- */
 $('startBtn').onclick=()=>{
   const name=$('fname').value.trim();
   if(!name){ $('fname').focus(); return; }
   if(!video.videoWidth){ showErr(srcMode==='file'?'Video not loaded yet.':'Camera not ready yet.'); return; }
-  running=true; startTs=performance.now(); committed=null; pending=null; pendingN=0;
-  if(srcMode==='file'){ if(video.ended||video.currentTime>=(video.duration||1e9)) { try{video.currentTime=0;}catch(_){}} video.play(); }
+  running=true; startTs=performance.now();
+  if(srcMode==='file'){ if(video.ended||video.currentTime>=(video.duration||1e9)){ try{video.currentTime=0;}catch(_){}} video.play(); }
   $('startBtn').style.display='none'; $('stopBtn').style.display='block';
   $('fname').disabled=true; tick();
 };
@@ -326,30 +355,47 @@ $('stopBtn').onclick=()=>{
   if(srcMode==='file') video.pause();
   $('stopBtn').style.display='none'; $('startBtn').style.display='block';
   $('fname').disabled=false; $('pill').className='pill';
-  if(rows.length) exportCSV();
+  if(STORE.logs.length) exportCSV();
 };
+
+/* ---------------- export (gold schema) ---------------- */
+function csvText(){
+  const title=$('fname').value.trim()||'trial';
+  const target=parseFloat($('target').value)||'';
+  const rows=STORE.emit(title, target||null);
+  const esc=s=>'"'+String(s).replace(/"/g,'""')+'"';
+  const head='Video title,Track,Log number,Portion number,Target Weight (g),Weight (g),Heel/End,Notes\n';
+  return head+rows.map(r=>[title,r.track,r.log,r.pn,target,r.weight,
+    r.heel?'Heel/End':'', r.note?esc(r.note):''].join(',')).join('\n');
+}
 function exportCSV(){
-  if(!rows.length){ return; }
-  const name=($('fname').value.trim()||'trial')+'.csv';
-  const head='index,elapsed_s,track1,track2,raw\n';
-  const body=rows.map((r,i)=>[i+1,r.t,r.t1??'',r.t2??'','"'+(r.raw||'').replace(/"/g,'""')+'"'].join(',')).join('\n');
-  const blob=new Blob([head+body],{type:'text/csv'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click();
+  const blob=new Blob([csvText()],{type:'text/csv'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=($('fname').value.trim()||'trial')+'_portion_weights.csv'; a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),2000);
 }
 $('exportBtn').onclick=exportCSV;
-$('clearBtn').onclick=()=>{ rows=[]; $('log').innerHTML=''; $('count').textContent='0'; committed=null; };
+$('clearBtn').onclick=()=>{ STORE=new LogStore(); BANK=new GlyphBank(); sampleIdx=0; cachedAngle=0; $('log').innerHTML=''; $('count').textContent='0'; $('logcount').textContent='0'; $('fcount').textContent='0'; };
 
-/* ---------------- test hook (headless OCR validation) ---------------- */
-window.__ocrTest=async function(url){
-  const img=new Image(); img.crossOrigin='anonymous';
-  await new Promise((res,rej)=>{img.onload=res;img.onerror=rej;img.src=url;});
-  work.width=img.width; work.height=img.height; wctx.drawImage(img,0,0);
-  const {data}=await worker.recognize(work,{},{blocks:true});
-  return {text:data.text, parsedTop:parseFrame(data, work.width)};
+/* ---------------- test hooks (headless validation) ---------------- */
+window.__engineFrame=async function(url){
+  const img=new Image(); await new Promise((res,rej)=>{img.onload=res;img.onerror=rej;img.src=url;});
+  const blocks=await analyse(img, img.width, img.height, false);
+  return {blocks};
 };
-// dev: load a served video URL (e.g. the canonical test clip) for repeatable testing
-window.__loadTestVid=(url)=>{ if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;} srcMode='file'; video.srcObject=null; video.muted=true; video.playsInline=true; video.loop=false; video.src=url; video.onloadeddata=()=>{ video.pause(); try{video.currentTime=0;}catch(_){}} ; video.onloadedmetadata=()=>{ fitVideo(); placeRoiDefault(); banner.style.display='none'; }; };
+window.__engineImages=async function(urls, title, target, reset){
+  if(reset!==false){ STORE=new LogStore(); BANK=new GlyphBank(); sampleIdx=0; }
+  if(sampleIdx===0&&urls.length){ try{ await window.__engineFrame(urls[0]); }catch(e){} }  // bank warm-up
+  let ok=0;
+  for(const u of urls){
+    try{
+      const r=await window.__engineFrame(u);
+      if(r&&r.blocks){ sampleIdx++; STORE.absorb(r.blocks, sampleIdx); ok++; }
+    }catch(e){ /* skip */ }
+  }
+  $('fname').value=title||'trial'; if(target) $('target').value=target;
+  return {ok, total:urls.length, csv:csvText()};
+};
 
 /* ---------------- go ---------------- */
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
