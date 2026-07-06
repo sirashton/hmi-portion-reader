@@ -66,7 +66,26 @@
   th:first-child,td:first-child{text-align:left;}
   thead th{position:sticky;top:0;background:#eef3f2;color:var(--muted);font-size:11px;text-transform:uppercase;z-index:1;}
   td.flag{color:var(--reject);font-weight:700;}
-  .foot{padding:8px 12px;display:flex;gap:8px;background:var(--panel);border-top:1px solid var(--grid);}
+  .foot{padding:8px 12px;display:flex;gap:8px;background:var(--panel);border-top:1px solid var(--grid);flex-wrap:wrap;align-items:center;}
+  /* ---- analysis section ---- */
+  .anl{display:none;background:var(--panel);border-top:2px solid var(--ink);padding:10px 12px 18px;}
+  .anl.open{display:block;}
+  .anl h3{font-size:13px;margin:14px 0 6px;color:var(--ink);}
+  .anl canvas{width:100%;display:block;background:#fbfcfc;border:1px solid var(--grid);border-radius:8px;}
+  .kpis{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 4px;}
+  .kpi{flex:1;min-width:130px;background:#fbfcfc;border:1px solid var(--grid);border-radius:8px;padding:8px 10px;}
+  .kpi .kt{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;}
+  .kpi .kv{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .kpi .ks{font-size:11px;color:var(--muted);}
+  .trows{margin:6px 0;}
+  .trow{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px dashed var(--grid);font-size:13px;}
+  .trow .tn em{color:var(--muted);font-style:normal;font-size:11px;}
+  .tseg button{padding:4px 10px;font-size:12px;border:1px solid var(--grid);background:#fff;border-radius:6px;margin-left:3px;font-weight:700;color:var(--muted);}
+  .tseg .on-a{background:#e85a1a;border-color:#e85a1a;color:#fff;}
+  .tseg .on-b{background:#2a3847;border-color:#2a3847;color:#fff;}
+  .tseg .on-x{background:#eef2f1;color:var(--ink);}
+  .leg{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:9px;color:#fff;margin-right:6px;}
+  .leg.a{background:#e85a1a;} .leg.b{background:#2a3847;} .leg.f{background:#b12028;}
   .banner{padding:10px 12px;font-size:13px;background:#fff4d6;color:#6b5300;border-bottom:1px solid #e8d98a;}
   .banner.err{background:#fdecec;color:#a11;border-color:#f2b8b8;}
   .pill{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--muted);margin-right:5px;vertical-align:middle;}
@@ -142,12 +161,30 @@
   <button id="framesBtn" class="btn-ghost" style="flex:1" disabled>⬇ Frames (0)</button>
   <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);font-weight:600;">
     <input id="keepFrames" type="checkbox" checked>save frames</label>
+  <button id="anlBtn" class="btn-ghost">📊 Analysis</button>
   <button id="clearBtn" class="btn-ghost">Clear</button>
+</div>
+
+<div class="anl" id="anl">
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+    <div><span class="leg a">Group A</span><span class="leg b">Group B</span><span class="leg f">flagged</span></div>
+    <button id="importBtn" class="btn-ghost" style="padding:6px 12px;font-size:12px;">＋ Import trial CSV</button>
+    <input id="importInput" type="file" accept=".csv" style="display:none" multiple>
+  </div>
+  <div class="trows" id="trows"></div>
+  <div class="kpis" id="kpis"></div>
+  <h3>Portion weight vs position (% of target)</h3>
+  <canvas id="cScatter"></canvas>
+  <h3>CV by portion position</h3>
+  <canvas id="cCv"></canvas>
+  <h3>CV contribution by position <span style="color:var(--muted);font-weight:400">(CV all − CV excluding that position, pp)</span></h3>
+  <canvas id="cContrib"></canvas>
 </div>
 
 <script src="tess/tesseract.min.js"></script>
 <script src="pipeline.js"></script>
 <script src="engine.js"></script>
+<script src="analysis.js"></script>
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
@@ -471,7 +508,7 @@ async function tick(){
     if(blocks){
       const top=blocks[0]&&blocks[0].rows[0];
       $('live').textContent = top ? `pn${top.pn??'?'}  ${top.t1??'—'} / ${top.t2??'—'}` : '—';
-      refreshTable(); renderMirror();
+      refreshTable(); renderMirror(); refreshAnalysis();
     } else $('live').textContent='searching…';
     drawOverlay();
   }catch(e){ /* skip a bad frame */ }
@@ -510,6 +547,27 @@ $('stopBtn').onclick=()=>{
   $('fname').disabled=false; $('pill').className='pill';
   if(STORE.logs.length) exportCSV();
 };
+
+/* ---------------- analysis section ---------------- */
+let anlOpen=false;
+$('anlBtn').onclick=()=>{ anlOpen=!anlOpen; $('anl').classList.toggle('open',anlOpen); $('anlBtn').style.background=anlOpen?'#e8f2f2':'#fff'; if(anlOpen) refreshAnalysis(); };
+$('importBtn').onclick=()=>$('importInput').click();
+$('importInput').onchange=async e=>{
+  for(const f of e.target.files||[]){
+    try{ ANALYSIS.importCsv(await f.text(), f.name.replace(/\.csv$/i,'')); }catch(_){/*skip*/}
+  }
+  e.target.value=''; refreshAnalysis();
+};
+function refreshAnalysis(){
+  if(!anlOpen) return;
+  const rows=STORE.emit($('fname').value.trim()||'live', parseFloat($('target').value)||null);
+  ANALYSIS.upsertLive($('fname').value.trim()||'live', parseFloat($('target').value)||null, rows);
+  ANALYSIS.trialList($('trows'), refreshAnalysis);
+  ANALYSIS.kpis($('kpis'));
+  ANALYSIS.drawScatter($('cScatter'));
+  ANALYSIS.drawCvBars($('cCv'));
+  ANALYSIS.drawContrib($('cContrib'));
+}
 
 /* ---------------- export (gold schema) ---------------- */
 function csvText(){

@@ -1,5 +1,23 @@
 # Changelog
 
+## v2.3 — 2026-07-06 · live analysis
+- **📊 Analysis view**: real-time portion CV explained by portion position — weight-vs-position
+  scatter (% of target), CV by position, and CV-contribution bars, following the
+  PortionTrialViz conventions (pos/neg indexing with tail-3 slots + MID bucket, light-last
+  stripping, extreme-portion flagging/exclusion).
+- **A/B attribution**: the live capture is a trial (default Group A); previous trial CSVs can
+  be imported and assigned A/B/off — all charts and KPIs compare the groups live, enabling
+  real-time A/B setting trials against a reference run. (SW v8)
+
+## v2.2 — 2026-07-06 · live visual confirmation
+- Green **locate overlay** drawn on the feed around the identified list (column guides,
+  greys out when stale) — tracks pan/zoom.
+- **HMI mirror** panel beside the feed: what the reader currently sees, formatted like the
+  HMI list itself (blocks, separators, # | T1 | T2); green = confirmed across frames,
+  grey = awaiting confirmation.
+- **Frame archive**: every sampled frame stored (toggleable) and exportable as a ZIP
+  (dependency-free writer, verified CRC-valid) for later re-evaluation of any trial. (SW v7)
+
 ## v2.1 — 2026-07-06
 - Screen wake-lock while a trial is running (phone no longer sleeps mid-capture).
 - Python reference implementation + ground-truth evaluator added under `reference/`.

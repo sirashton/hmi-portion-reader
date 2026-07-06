@@ -31,6 +31,19 @@ fully cached; every frame is processed on the phone itself and nothing leaves th
 To process a recorded clip instead: **📁 Video**, pick the file, **Start** — it plays,
 reads, and auto-stops at the end (CSV timestamps follow the clip).
 
+**Visual confirmation while running:** a green box on the feed shows the area the reader
+has identified (with column guides); the panel beside the feed mirrors the HMI list as
+the reader currently sees it — green values are confirmed across frames, grey are still
+awaiting confirmation.
+
+**📊 Analysis** opens the real-time trial view: portion-weight scatter by position,
+CV by portion position, and CV-contribution bars, with **A/B group attribution** — the
+live capture is a trial (Group A by default) and previous trial CSVs can be imported and
+assigned to either group for a live A-vs-B comparison of slicer settings.
+
+**Frame archive:** every sampled frame is kept (toggleable) and downloads as a ZIP via
+**⬇ Frames**, so any trial can be re-processed or verified later.
+
 ## How it works — three stages
 
 ```
