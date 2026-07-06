@@ -5,7 +5,8 @@ Usage: python run_all.py [--step 2] [--only NamePart]
 import argparse, os, subprocess, sys, re
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-VIDS = os.path.normpath(os.path.join(HERE, '..', '..', 'Portion Trial Vids'))
+VIDS = os.path.normpath(os.path.join(
+    HERE, '..', '..', 'Trials', 'Portion weight HMI video capture', 'Portion Trial Vids'))
 TARGETS = {  # from the gold CSVs' Target column
     'T1_Control': 776, 'T1_ControlB': 667, 'T1_NarrowControlRange': 667,
     'T1_RasherRange7': 667, 'T1_React10A': 667, 'T1_React10B': 667,

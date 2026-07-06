@@ -33,3 +33,13 @@ CSV schema: `Video title, Track, Log number, Portion number, Target Weight (g), 
 
 ## Requirements
 `pip install rapidocr-onnxruntime opencv-python numpy`
+
+## Batch processing (for agents / bulk runs)
+`process_videos.py` — video(s) in → `<video>_portion_weights.csv` out, next to each video:
+```
+python process_videos.py "path/to/video.mp4" --target 667          # one video
+python process_videos.py --dir "path/to/folder" --prefix T2_ --target 667   # a batch
+```
+Skips videos whose CSV already exists (`--force` to redo); resolves the target from
+`TrialLog.xlsx` (searched up to two parent folders) when `--target` is omitted; prints one
+`START/RESULT/FAIL/SKIP` line per video and a final `SUMMARY`; exit code 0 = no failures.
